@@ -15,12 +15,14 @@ use App\Http\Controllers\Forms\Integration\FormIntegrationsEventController;
 use App\Http\Controllers\Forms\Integration\FormZapierWebhookController;
 use App\Http\Controllers\Forms\PublicFormController;
 use App\Http\Controllers\Forms\RecordController;
+use App\Http\Controllers\OAuth\OAuthProviderController;
 use App\Http\Controllers\Settings\PasswordController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\TemplateController;
 use App\Http\Controllers\WorkspaceController;
 use App\Http\Middleware\Form\ResolveFormMiddleware;
+use Illuminate\Foundation\Http\Middleware\HandlePrecognitiveRequests;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
@@ -42,8 +44,16 @@ Route::group(['middleware' => 'auth:api'], function () {
     Route::get('user', [UserController::class, 'current'])->name('user.current');
     Route::delete('user', [UserController::class, 'deleteAccount']);
 
-    Route::patch('settings/profile', [ProfileController::class, 'update']);
-    Route::patch('settings/password', [PasswordController::class, 'update']);
+    Route::prefix('/settings')->name('settings.')->group(function () {
+        Route::patch('/profile', [ProfileController::class, 'update']);
+        Route::patch('/password', [PasswordController::class, 'update']);
+
+        Route::prefix('/providers')->name('providers.')->group(function () {
+            Route::post('/connect/{service}', [OAuthProviderController::class, 'connect'])->name('connect');
+            Route::post('/callback/{service}', [OAuthProviderController::class, 'handleRedirect'])->name('callback');
+            Route::delete('/{provider}', [OAuthProviderController::class, 'destroy'])->name('destroy');
+        });
+    });
 
     Route::prefix('subscription')->name('subscription.')->group(function () {
         Route::put('/update-customer-details', [SubscriptionController::class, 'updateStripeDetails'])->name('update-stripe-details');
@@ -55,6 +65,8 @@ Route::group(['middleware' => 'auth:api'], function () {
     });
 
     Route::prefix('open')->name('open.')->group(function () {
+        Route::get('/providers', [OAuthProviderController::class, 'index'])->name('index');
+
         Route::get('/forms', [FormController::class, 'indexAll'])->name('forms.index-all');
         Route::get('/forms/{slug}', [FormController::class, 'show'])->name('forms.show');
 
@@ -122,7 +134,7 @@ Route::group(['middleware' => 'auth:api'], function () {
             Route::post(
                 '/assets/upload',
                 [FormController::class, 'uploadAsset']
-            )->name('assets.upload');
+            )->withoutMiddleware(['auth:api'])->name('assets.upload');
             Route::get(
                 '/{id}/uploaded-file/{filename}',
                 [FormController::class, 'viewFile']
@@ -225,7 +237,7 @@ Route::group(['prefix' => 'appsumo'], function () {
  */
 Route::prefix('forms')->name('forms.')->group(function () {
     Route::middleware('protected-form')->group(function () {
-        Route::post('{slug}/answer', [PublicFormController::class, 'answer'])->name('answer');
+        Route::post('{slug}/answer', [PublicFormController::class, 'answer'])->name('answer')->middleware(HandlePrecognitiveRequests::class);
 
         // Form content endpoints (user lists, relation lists etc.)
         Route::get(

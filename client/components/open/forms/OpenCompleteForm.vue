@@ -45,7 +45,7 @@
     <v-transition>
       <div
         v-if="!form.is_password_protected && form.password && !hidePasswordDisabledMsg"
-        class="border shadow-sm p-2 my-4 flex items-center rounded-md bg-yellow-100 border-yellow-500"
+        class="border shadow-sm p-2 my-4 flex items-center rounded-md bg-yellow-100 dark:bg-yellow-600/20 border-yellow-500 dark:border-yellow-500/20"
       >
         <div class="flex flex-grow">
           <p class="mb-0 py-2 px-4 text-yellow-600 dark:text-yellow-600">
@@ -63,7 +63,7 @@
 
     <div
       v-if="isPublicFormPage && (form.is_closed || form.visibility=='closed')"
-      class="border shadow-sm p-2 my-4 flex items-center rounded-md bg-yellow-100 border-yellow-500"
+      class="border shadow-sm p-2 my-4 flex items-center rounded-md bg-yellow-100 dark:bg-yellow-600/20 border-yellow-500 dark:border-yellow-500/20"
     >
       <div class="flex-grow">
         <p
@@ -75,11 +75,11 @@
 
     <div
       v-if="isPublicFormPage && form.max_number_of_submissions_reached"
-      class="border shadow-sm p-2 my-4 flex items-center rounded-md bg-yellow-100 border-yellow-500"
+      class="border shadow-sm p-2 my-4 flex items-center rounded-md bg-yellow-100 dark:bg-yellow-600/20 border-yellow-500 dark:border-yellow-500/20"
     >
       <div class="flex-grow">
-        <p
-          class="mb-0 py-2 px-4 text-yellow-600"
+        <div
+          class="mb-0 py-2 px-4 text-yellow-600 dark:text-yellow-600"
           v-html="form.max_submissions_reached_text"
         />
       </div>
@@ -193,13 +193,12 @@
 <script>
 import OpenForm from './OpenForm.vue'
 import OpenFormButton from './OpenFormButton.vue'
-import { themes } from '~/lib/forms/form-themes.js'
 import VButton from '~/components/global/VButton.vue'
 import FormCleanings from '../../pages/forms/show/FormCleanings.vue'
 import VTransition from '~/components/global/transitions/VTransition.vue'
 import {pendingSubmission} from "~/composables/forms/pendingSubmission.js"
 import clonedeep from "clone-deep"
-import { default as _has } from 'lodash/has'
+import ThemeBuilder from "~/lib/forms/themes/ThemeBuilder.js"
 
 export default {
   components: { VTransition, VButton, OpenFormButton, OpenForm, FormCleanings },
@@ -227,7 +226,6 @@ export default {
     return {
       loading: false,
       submitted: false,
-      themes: themes,
       passwordForm: useForm({
         password: null
       }),
@@ -241,7 +239,10 @@ export default {
       return import.meta.client && window.location.href.includes('popup=true')
     },
     theme () {
-      return this.themes[_has(this.themes, this.form.theme) ? this.form.theme : 'default']
+      return new ThemeBuilder(this.form.theme, {
+        size: this.form.size,
+        borderRadius: this.form.border_radius
+      }).getAllComponents()
     },
     isPublicFormPage () {
       return this.$route.name === 'forms-slug'
@@ -272,7 +273,8 @@ export default {
           type: 'form-submitted',
           form: {
             slug: this.form.slug,
-            id: this.form.id
+            id: this.form.id,
+            redirect_target_url: (this.form.is_pro && data.redirect && data.redirect_url) ? data.redirect_url : null
           },
           submission_data: form.data()
         })

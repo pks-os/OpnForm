@@ -3,10 +3,18 @@
 namespace App\Rules;
 
 use App\Service\Forms\FormLogicConditionChecker;
-use Illuminate\Contracts\Validation\Rule;
+use Closure;
+use Illuminate\Contracts\Validation\ValidationRule;
 
-class CustomFieldValidationRule implements Rule
+class CustomFieldValidationRule implements ValidationRule
 {
+    /**
+     * Indicates whether the rule should be implicit.
+     *
+     * @var bool
+     */
+    public $implicit = true;
+
     /**
      * Create a new rule instance.
      *
@@ -25,15 +33,22 @@ class CustomFieldValidationRule implements Rule
      */
     public function passes($attribute, $value)
     {
-        if (!($this->validation['error_conditions']['conditions'] ?? null) || is_null(
-            $this->validation['error_conditions']['conditions'] ?? null
-        )) {
+        $logicConditions = $this->validation['error_conditions']['conditions'] ?? null;
+        if (empty($logicConditions) || empty($logicConditions['children'] ?? [])) {
             return true;
         }
+
         return FormLogicConditionChecker::conditionsMet(
-            $this->validation['error_conditions']['conditions'],
+            $logicConditions,
             $this->formData
         );
+    }
+
+    public function validate(string $attribute, mixed $value, Closure $fail): void
+    {
+        if (!$this->passes($attribute, $value)) {
+            $fail($this->message());
+        }
     }
 
     /**
