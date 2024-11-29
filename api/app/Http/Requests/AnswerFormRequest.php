@@ -14,6 +14,7 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Stevebauman\Purify\Facades\Purify;
 
 class AnswerFormRequest extends FormRequest
 {
@@ -66,12 +67,20 @@ class AnswerFormRequest extends FormRequest
             foreach ($selectionFields as $field) {
                 if (isset($data[$field['id']]) && is_array($data[$field['id']])) {
                     $data[$field['id']] = array_map(function ($val) use ($field) {
+                        // Find the option by exact ID match first
                         $tmpop = collect($field[$field['type']]['options'])->first(function ($op) use ($val) {
-                            return $op['id'] ?? $op['value'] === $val;
+                            return $op['id'] === $val || $op['name'] === $val;
                         });
 
-                        return isset($tmpop['name']) ? $tmpop['name'] : '';
+                        // Return the original value if no match found
+                        return isset($tmpop['name']) ? $tmpop['name'] : $val;
                     }, $data[$field['id']]);
+                } elseif (isset($data[$field['id']])) {
+                    // Handle single select values
+                    $tmpop = collect($field[$field['type']]['options'])->first(function ($op) use ($field, $data) {
+                        return $op['id'] === $data[$field['id']] || $op['name'] === $data[$field['id']];
+                    });
+                    $data[$field['id']] = isset($tmpop['name']) ? $tmpop['name'] : $data[$field['id']];
                 }
             }
             if (FormLogicPropertyResolver::isRequired($property, $data)) {
@@ -167,6 +176,7 @@ class AnswerFormRequest extends FormRequest
     {
         switch ($property['type']) {
             case 'text':
+            case 'rich_text':
             case 'signature':
                 return ['string'];
             case 'number':
@@ -273,6 +283,10 @@ class AnswerFormRequest extends FormRequest
 
             if ($property['type'] === 'phone_number' && (!isset($property['use_simple_text_input']) || !$property['use_simple_text_input']) && $receivedValue && in_array($receivedValue, $countryCodeMapper)) {
                 $mergeData[$property['id']] = null;
+            }
+
+            if ($property['type'] === 'rich_text' && $receivedValue) {
+                $mergeData[$property['id']] = Purify::clean($receivedValue);
             }
         });
 
