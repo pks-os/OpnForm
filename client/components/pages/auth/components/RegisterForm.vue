@@ -52,6 +52,19 @@
         label="Confirm Password"
       />
 
+      <!-- Captcha -->
+      <div
+        v-if="recaptchaSiteKey"
+        class="my-4 px-2 mx-auto w-max"
+      >
+        <CaptchaInput
+          ref="captcha"
+          provider="recaptcha"
+          :form="form"
+          language="en"
+        />
+      </div>
+
       <checkbox-input
         :form="form"
         name="agree_terms"
@@ -125,7 +138,7 @@
 
 <script>
 import {opnFetch} from "~/composables/useOpnApi.js"
-import {fetchAllWorkspaces} from "~/stores/workspaces.js"
+import { fetchAllWorkspaces } from "~/stores/workspaces.js"
 
 export default {
   name: "RegisterForm",
@@ -146,6 +159,7 @@ export default {
       formsStore: useFormsStore(),
       workspaceStore: useWorkspacesStore(),
       providersStore: useOAuthProvidersStore(),
+      runtimeConfig: useRuntimeConfig(),
       logEvent: useAmplitude().logEvent,
       $utm
     }
@@ -159,12 +173,16 @@ export default {
       password_confirmation: "",
       agree_terms: false,
       appsumo_license: null,
-      utm_data: null
+      utm_data: null,
+      'g-recaptcha-response': null
     }),
-    disableEmail:false
+    disableEmail: false,
   }),
 
   computed: {
+    recaptchaSiteKey() {
+      return this.runtimeConfig.public.recaptchaSiteKey
+    },
     hearAboutUsOptions() {
       const options = [
         {name: "Facebook", value: "facebook"},
@@ -208,6 +226,10 @@ export default {
     async register() {
       let data
       this.form.utm_data = this.$utm.value
+      // Reset captcha after submission
+      if (import.meta.client && this.recaptchaSiteKey) {
+        this.$refs.captcha.reset()
+      }
       try {
         // Register the user.
         data = await this.form.post("/register")
